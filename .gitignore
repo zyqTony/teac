@@ -1,0 +1,10 @@
+.DS_Store
+*.o
+compiler
+target
+tests/std/std.ll
+tests/*/build/
+.vscode
+*.ll
+.cursor
+.claude
