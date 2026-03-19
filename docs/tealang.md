@@ -49,6 +49,20 @@ Examples: `0`, `1`, `42`, `1005`
 
 Spaces, tabs, newlines, and carriage returns are automatically skipped between tokens.
 
+### Comments
+
+TeaLang supports single-line and multi-line comments, which are automatically skipped between tokens.
+
+- **Single-line comments**: start with `//` and continue to the end of the line.
+- **Multi-line comments**: enclosed between `/*` and `*/`.
+
+Examples:
+```rust
+// This is a single-line comment
+/* This is a
+   multi-line comment */
+```
+
 ---
 
 ## Module System
@@ -75,34 +89,34 @@ use a::b::c;           // multi-level module path
 
 ### Type Specifications
 
-TeaLang supports primitive types and user-defined types.
+TeaLang supports primitive types, user-defined types, and reference types.
 
 ```
-typeSpec := < i32 > | identifier
+refType  := < & > < [ > typeSpec < ] >
+typeSpec := refType | < i32 > | identifier
 ```
 
-Examples: `i32`, `Node`, `Queue`
+Examples: `i32`, `Node`, `&[i32]`
 
 ### Variable Declarations
 
-Variable declarations are categorized into five distinct forms. Note that `slice_decl` is only valid as a function parameter — it cannot be used directly in a `let` statement.
+Variable declarations are categorized into four forms:
 
 ```
 scalar_decl       := identifier                                             // scalar without type
 typed_scalar_decl := identifier < : > typeSpec                             // scalar with type
 array_decl        := identifier < [ > num < ] >                            // array without type
 typed_array_decl  := identifier < : > < [ > typeSpec < ; > num < ] >       // array with type and size
-slice_decl        := identifier < : > < & > < [ > typeSpec < ] >           // slice reference (parameter only)
 ```
 
 ```
-varDecl := typed_scalar_decl
-         | scalar_decl
-         | typed_array_decl
+varDecl := typed_array_decl
+         | typed_scalar_decl
          | array_decl
+         | scalar_decl
 ```
 
-> **Note:** `slice_decl` is only permitted in function parameter lists (`paramDecl`), not in `let` declarations.
+Since `typeSpec` includes reference types (`&[T]`), a `typed_scalar_decl` like `arr: &[i32]` declares a slice reference parameter. This form is only valid in function parameter lists — it cannot appear in `let` statements or struct fields. This constraint is enforced semantically, not syntactically.
 
 Examples:
 ```rust
@@ -110,6 +124,7 @@ n:i32                    // typed_scalar_decl
 count                    // scalar_decl
 arr: [i32; 100]         // typed_array_decl
 que[1005]               // array_decl
+buf: &[i32]             // typed_scalar_decl with reference type (parameter only)
 ```
 
 ### Variable Declaration Statements
@@ -129,7 +144,7 @@ arrayInitializer := < [ > rightValList < ] >          // explicit list: [1, 2, 3
                   | < [ > rightVal < ; > num < ] >    // fill syntax:   [0; 5] means five 0s
 ```
 
-> **Note:** `slice_decl` cannot appear in `let` statements.
+> **Note:** Reference-typed declarations (`name: &[type]`) cannot appear in `let` statements.
 
 Examples:
 ```rust
@@ -146,7 +161,7 @@ let count = 0;                          // type inference scalar
 
 ## Structure Definitions
 
-Define custom types using the `struct` keyword with named fields. Struct fields use `varDecl` (scalars and arrays only; slices are not permitted as struct fields).
+Define custom types using the `struct` keyword with named fields. Struct fields use `varDecl` (scalars and arrays only; reference types are not permitted as struct fields).
 
 ```
 structDef := < struct > identifier < { > varDeclList < } >
@@ -167,14 +182,13 @@ struct Node {
 
 ### Function Declarations
 
-Declare function signatures with optional return types. Function parameters may include `slice_decl` to accept array references.
+Declare function signatures with optional return types. Function parameters use `varDecl`, which includes reference-typed parameters like `arr: &[i32]` via `typeSpec`.
 
 ```
 fnDeclStmt := fnDecl < ; >
 fnDecl := < fn > identifier < ( > paramDecl? < ) > < -> > typeSpec   // with return type
         | < fn > identifier < ( > paramDecl? < ) >                   // without return type
-paramDecl := paramItem (< , > paramItem)*
-paramItem := slice_decl | varDecl
+paramDecl := varDeclList
 ```
 
 Examples:
@@ -182,7 +196,7 @@ Examples:
 fn quickread() -> i32;                      // declaration with return type
 fn move(x:i32, y:i32);                     // declaration without return type
 fn init();                                  // no parameters
-fn sum(arr: &[i32], n:i32) -> i32;         // slice parameter for array passing
+fn sum(arr: &[i32], n:i32) -> i32;         // reference parameter for array passing
 ```
 
 ### Function Definitions
@@ -215,16 +229,12 @@ fn main() -> i32 {
 
 ### Function Calls
 
-Functions can be called with module prefixes (for external functions) or locally. Array arguments are passed by reference using `&identifier`. Module prefixes support multiple levels.
+Functions can be called with module prefixes (for external functions) or locally. Array arguments are passed by reference using `&identifier`, which is a regular expression unit (see [Expression Units](#expression-units)). Module prefixes support multiple levels.
 
 ```
 fnCall := modulePrefixedCall | localCall
-modulePrefixedCall := modulePath < :: > identifier < ( > argList? < ) >
-localCall := identifier < ( > argList? < ) >
-
-argList  := arg (< , > arg)*
-arg      := < & > identifier                                        // pass array by reference
-          | rightVal                                                // pass scalar / expression by value
+modulePrefixedCall := modulePath < :: > identifier < ( > rightValList? < ) >
+localCall := identifier < ( > rightValList? < ) >
 ```
 
 Examples:
@@ -433,6 +443,7 @@ Primary expressions that form the building blocks of larger expressions.
 ```
 exprUnit := < ( > arithExpr < ) >
           | fnCall
+          | < & > identifier                                // address-of: produces &[T] reference
           | < - > num                                       // negative literal
           | num
           | identifier exprSuffix*
@@ -447,7 +458,8 @@ x
 arr[i]
 node.value
 std::getint()
-0-x                     // negative number
+&arr                    // address-of (array reference)
+-1                      // negative literal
 (a + b) * c            // parenthesized expression
 list[cnt].next         // chained access
 ```
@@ -581,14 +593,13 @@ fn main() -> i32 {
 3. **Array Initializers**: Two forms are supported:
    - `[val1, val2, ...]` — explicit element list (e.g., `[1, 2, 3]`)
    - `[val; n]` — fill syntax, equivalent to `n` copies of `val` (e.g., `[0; 5]` means five zeros)
-4. **Slice References (`slice_decl`)**: `slice_decl` (`name: &[type]`) is only valid as a function parameter. It cannot appear in `let` statements or struct fields.
-5. **Passing Arrays by Reference**: Use `&identifier` at the call site to pass an array by reference: `fill(&arr, n)`. The corresponding parameter must be declared as a `slice_decl`.
+4. **Reference Types**: Reference-typed declarations (`name: &[type]`) are only valid as function parameters. They cannot appear in `let` statements or struct fields. This constraint is enforced semantically, not syntactically.
+5. **Passing Arrays by Reference**: Use `&identifier` at the call site to pass an array by reference: `fill(&arr, n)`. The `&identifier` form is a regular expression unit and the corresponding parameter must be declared with a reference type (e.g., `arr: &[i32]`).
 6. **Variable Declaration Forms**:
    - `scalar_decl` — `name` (no type)
-   - `typed_scalar_decl` — `name: type`
+   - `typed_scalar_decl` — `name: type` (includes `name: &[type]` for reference parameters)
    - `array_decl` — `name[size]` (no type)
    - `typed_array_decl` — `name: [type; size]`
-   - `slice_decl` — `name: &[type]` (parameter only)
 7. **Module System**: Module paths support multiple levels separated by `::` (e.g., `use a::b::c;`). Functions from external modules are called using the full module path as prefix (e.g., `a::b::fn_name(...)`).
 8. **No Implicit Conversions**: All type conversions must be explicit.
 9. **Operator Precedence**: Standard mathematical precedence applies (multiplication/division before addition/subtraction).

@@ -141,15 +141,14 @@ fn get_pos(pair: &Pair) -> usize {
 }
 
 fn parse_use_stmt(pair: Pair) -> ParseResult<ast::UseStmt> {
-    let pair_for_error = pair.clone();
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::identifier {
-            return Ok(ast::UseStmt {
-                module_name: inner.as_str().to_string(),
-            });
-        }
-    }
-    Err(grammar_error("use_stmt", &pair_for_error))
+    let parts: Vec<&str> = pair
+        .into_inner()
+        .filter(|p| p.as_rule() == Rule::identifier)
+        .map(|p| p.as_str())
+        .collect();
+    Ok(ast::UseStmt {
+        module_name: parts.join("::"),
+    })
 }
 
 fn parse_program_element(pair: Pair) -> ParseResult<Option<Box<ast::ProgramElement>>> {
@@ -249,8 +248,9 @@ fn parse_type_spec(pair: Pair) -> ParseResult<Rc<Option<ast::TypeSpecifier>>> {
 
     for child in &children {
         match child.as_rule() {
-            Rule::ampersand => {
-                let inner_type_spec = children
+            Rule::ref_type => {
+                let ref_children: Vec<_> = child.clone().into_inner().collect();
+                let inner_type_spec = ref_children
                     .iter()
                     .find(|c| c.as_rule() == Rule::type_spec)
                     .expect("Ref type_spec must have inner type_spec");
@@ -858,23 +858,23 @@ fn parse_fn_call(pair: Pair) -> ParseResult<Box<ast::FnCall>> {
 
 fn parse_module_prefixed_call(pair: Pair) -> ParseResult<Box<ast::FnCall>> {
     let inner_pairs: Vec<_> = pair.into_inner().collect();
-    let mut module_prefix = None;
-    let mut name = String::new();
+    let mut idents: Vec<String> = Vec::new();
     let mut vals = Vec::new();
 
-    for inner in inner_pairs {
+    for inner in &inner_pairs {
         match inner.as_rule() {
-            Rule::identifier => {
-                if module_prefix.is_none() {
-                    module_prefix = Some(inner.as_str().to_string());
-                } else {
-                    name = inner.as_str().to_string();
-                }
-            }
-            Rule::right_val_list => vals = parse_right_val_list(inner)?,
+            Rule::identifier => idents.push(inner.as_str().to_string()),
+            Rule::right_val_list => vals = parse_right_val_list(inner.clone())?,
             _ => {}
         }
     }
+
+    let name = idents.pop().unwrap_or_default();
+    let module_prefix = if idents.is_empty() {
+        None
+    } else {
+        Some(idents.join("::"))
+    };
 
     Ok(Box::new(ast::FnCall {
         module_prefix,

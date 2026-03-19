@@ -115,26 +115,32 @@ identifier = @{
 }
 
 // Types
+// Reference type: &[T], e.g., &[i32]
+// Example: "fn fill(arr: &[i32], n:i32)" in function parameters
+ref_type = {
+    ampersand ~ lbracket ~ type_spec ~ rbracket
+}
+
 // Type specification: integer type, user-defined type, or reference type
 // Examples: "i32", "Node", "Queue", "&[i32]"
 type_spec = {
-    ampersand ~ lbracket ~ type_spec ~ rbracket   // reference type: &[T]
+    ref_type
     | kw_i32
     | identifier
 }
 
 // Program structure
-// A complete TeaLang program: optional use statements, followed by program elements
+// A complete TeaLang program: use statements, declarations, and definitions in any order
 // Example: "use std; let n:i32; fn main() -> i32 { return 0; }"
 program = {
-    SOI ~ use_stmt* ~ program_element* ~ EOI
+    SOI ~ (use_stmt | program_element)* ~ EOI
 }
 
 // Use statement
-// Import a module (typically 'std' for standard library)
-// Example: "use std;"
+// Import a module with a possibly multi-level path
+// Examples: "use std;", "use a::b::c;"
 use_stmt = {
-    kw_use ~ identifier ~ semicolon
+    kw_use ~ identifier ~ (double_colon ~ identifier)* ~ semicolon
 }
 
 // Program element: variable declaration, struct definition, function declaration or definition
@@ -404,10 +410,10 @@ fn_call = {
     | local_call
 }
 
-// Function call with module prefix (e.g., std::getint())
-// Examples: "std::getint()", "std::putch(10)", "std::timer_start(97)"
+// Function call with module prefix, supporting multi-level paths
+// Examples: "std::getint()", "std::putch(10)", "a::b::func(x)"
 module_prefixed_call = {
-    identifier ~ double_colon ~ identifier ~ lparen ~ right_val_list? ~ rparen
+    identifier ~ (double_colon ~ identifier)+ ~ lparen ~ right_val_list? ~ rparen
 }
 
 // Local function call (no module prefix)
