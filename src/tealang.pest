@@ -76,6 +76,16 @@ double_colon = { "::" }
 // Example: "&[i32]" in function parameters
 ampersand = { "&" }
 
+// 浮点数字面量
+float_literal = @{
+    // 形式1：1.0 / 123.456 / 0.0
+    (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+)
+    // 形式2：.5 / .123
+    | ("." ~ ASCII_DIGIT+)
+    // 形式3：1. / 42.
+    | (ASCII_DIGIT+ ~ ".")
+}
+
 // Numeric literal: zero or a non-zero digit followed by any digits
 // Examples: "0", "1", "10", "48", "57", "1005"
 num = @{
@@ -106,6 +116,8 @@ kw_return = @{ "return" ~ &(WHITESPACE | semicolon) }
 kw_i32 = @{ "i32" ~ &(WHITESPACE | semicolon | comma | rparen | lbrace | rbrace | rbracket | op_assign) }
 // Example: "use std;"
 kw_use = @{ "use" ~ WHITESPACE }
+// Example: "let pi:f32 = 3.14;"
+kw_f32 = @{ "f32" ~ &(WHITESPACE | semicolon | comma | rparen | lbrace | rbrace | rbracket | op_assign) }
 
 // Identifier: starts with letter or underscore, followed by letters, digits, or underscores
 // Cannot be a keyword: this step is performed after the keyword is recognized.
@@ -377,6 +389,8 @@ expr_unit = {
     | fn_call
     | ampersand ~ identifier           // address-of: &arr produces &[T] reference from array
     | op_sub ~ num  // negative number
+    | op_sub ~ float_literal
+    | float_literal
     | num
     | identifier ~ expr_suffix*
 }
