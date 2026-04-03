@@ -81,6 +81,7 @@ impl<'ir> FunctionGenerator<'ir> {
             ast::CodeBlockStmtInner::Call(s) => self.handle_call_stmt(s),
             ast::CodeBlockStmtInner::If(s) => self.handle_if_stmt(s, con_label, bre_label),
             ast::CodeBlockStmtInner::While(s) => self.handle_while_stmt(s),
+            ast::CodeBlockStmtInner::For(s) => self.handle_for_stmt(s),
             ast::CodeBlockStmtInner::Return(s) => self.handle_return_stmt(s),
             ast::CodeBlockStmtInner::Continue(_) => self.handle_continue_stmt(con_label),
             ast::CodeBlockStmtInner::Break(_) => self.handle_break_stmt(bre_label),
@@ -359,6 +360,49 @@ impl<'ir> FunctionGenerator<'ir> {
         self.emit_jump(test_label);
 
         self.emit_label(false_label);
+        Ok(())
+    }
+
+    pub fn handle_for_stmt(&mut self, stmt: &ast::ForStmt) -> Result<(), Error> {
+        let test_label = self.alloc_basic_block();
+        let body_label = self.alloc_basic_block();
+        let step_label = self.alloc_basic_block();
+        let after_label = self.alloc_basic_block();
+
+        let start_val = self.handle_expr_unit(&stmt.range_start)?;
+        let end_val = self.handle_expr_unit(&stmt.range_end)?;
+
+        self.enter_scope();
+
+        let loop_var = self.allocate_pointer_local(&stmt.iterator, Dtype::I32);
+        self.insert_scoped_local(&stmt.iterator, loop_var.clone())?;
+        self.emit_store(start_val, Operand::from(loop_var.clone()));
+
+        self.emit_jump(test_label.clone());
+
+        self.emit_label(test_label.clone());
+        let current = self.alloc_temporary(Dtype::I32);
+        self.emit_load(current.clone(), Operand::from(loop_var.clone()));
+        let cond = self.alloc_temporary(Dtype::I1);
+        self.emit_cmp(CmpPredicate::Slt, current, end_val, cond.clone());
+        self.emit_cjump(cond, body_label.clone(), after_label.clone());
+
+        self.emit_label(body_label);
+        for s in stmt.stmts.iter() {
+            self.handle_block(s, Some(step_label.clone()), Some(after_label.clone()))?;
+        }
+        self.emit_jump(step_label.clone());
+
+        self.emit_label(step_label);
+        let next_val = self.alloc_temporary(Dtype::I32);
+        self.emit_load(next_val.clone(), Operand::from(loop_var.clone()));
+        let incremented = self.alloc_temporary(Dtype::I32);
+        self.emit_biop(ArithBinOp::Add, next_val, Operand::from(1), incremented.clone());
+        self.emit_store(incremented.into(), Operand::from(loop_var));
+        self.emit_jump(test_label);
+
+        self.emit_label(after_label);
+        self.exit_scope();
         Ok(())
     }
 

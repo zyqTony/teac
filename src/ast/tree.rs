@@ -326,6 +326,7 @@ impl DisplayAsTree for CodeBlockStmtInner {
             CodeBlockStmtInner::Call(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
             CodeBlockStmtInner::If(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
             CodeBlockStmtInner::While(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
+            CodeBlockStmtInner::For(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
             CodeBlockStmtInner::Return(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
             CodeBlockStmtInner::Continue(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
             CodeBlockStmtInner::Break(stmt) => stmt.fmt_tree(f, indent_levels, is_last),
@@ -397,6 +398,28 @@ impl DisplayAsTree for WhileStmt {
             "{}WhileStmt Cond: {}",
             tree_indent(indent_levels, is_last),
             self.bool_unit
+        )?;
+        let mut new_indent = indent_levels.to_vec();
+        new_indent.push(is_last);
+        writeln!(f, "{}Body:", tree_indent(&new_indent, false))?;
+        self.stmts.fmt_tree(f, &new_indent, true)
+    }
+}
+
+impl DisplayAsTree for ForStmt {
+    fn fmt_tree(
+        &self,
+        f: &mut Formatter<'_>,
+        indent_levels: &[bool],
+        is_last: bool,
+    ) -> Result<(), Error> {
+        writeln!(
+            f,
+            "{}ForStmt {} in {}..{}",
+            tree_indent(indent_levels, is_last),
+            self.iterator,
+            self.range_start,
+            self.range_end
         )?;
         let mut new_indent = indent_levels.to_vec();
         new_indent.push(is_last);

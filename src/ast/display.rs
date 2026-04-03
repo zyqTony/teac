@@ -1,6 +1,7 @@
 use super::expr::*;
 use super::ops::*;
 use super::program::Program;
+use super::stmt::*;
 use super::tree::DisplayAsTree;
 use super::types::*;
 use std::fmt::{Display, Error, Formatter};
@@ -225,6 +226,12 @@ impl Display for ExprUnitInner {
 impl Display for ExprUnit {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.inner)
+    }
+}
+
+impl Display for ForStmt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "for {} in {}..{}", self.iterator, self.range_start, self.range_end)
     }
 }
 

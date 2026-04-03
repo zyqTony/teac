@@ -40,12 +40,21 @@ pub struct WhileStmt {
 }
 
 #[derive(Debug, Clone)]
+pub struct ForStmt {
+    pub iterator: String,
+    pub range_start: Box<super::expr::ExprUnit>,
+    pub range_end: Box<super::expr::ExprUnit>,
+    pub stmts: CodeBlockStmtList,
+}
+
+#[derive(Debug, Clone)]
 pub enum CodeBlockStmtInner {
     VarDecl(Box<VarDeclStmt>),
     Assignment(Box<AssignmentStmt>),
     Call(Box<CallStmt>),
     If(Box<IfStmt>),
     While(Box<WhileStmt>),
+    For(Box<ForStmt>),
     Return(Box<ReturnStmt>),
     Continue(Box<ContinueStmt>),
     Break(Box<BreakStmt>),

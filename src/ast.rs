@@ -18,8 +18,8 @@ pub use expr::{
 };
 
 pub use stmt::{
-    AssignmentStmt, BreakStmt, CallStmt, CodeBlockStmt, CodeBlockStmtInner, ContinueStmt, IfStmt,
-    NullStmt, ReturnStmt, WhileStmt,
+    AssignmentStmt, BreakStmt, CallStmt, CodeBlockStmt, CodeBlockStmtInner, ContinueStmt, ForStmt,
+    IfStmt, NullStmt, ReturnStmt, WhileStmt,
 };
 
 pub use decl::{
