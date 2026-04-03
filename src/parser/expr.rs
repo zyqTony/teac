@@ -249,6 +249,9 @@ impl<'a> ParseContext<'a> {
         Ok(expr)
     }
 
+    // --------------------------
+    // 【修改】parse_arith_term 调用 parse_cast_expr
+    // --------------------------
     fn parse_arith_term(&self, pair: Pair) -> ParseResult<Box<ast::ArithExpr>> {
         let pair_for_error = pair.clone();
         let inner_pairs: Vec<_> = pair.into_inner().collect();
@@ -257,7 +260,7 @@ impl<'a> ParseContext<'a> {
             return Err(grammar_error("arith_term", &pair_for_error));
         }
 
-        let first_unit = self.parse_expr_unit(inner_pairs[0].clone())?;
+        let first_unit = self.parse_cast_expr(inner_pairs[0].clone())?;
         let mut expr = Box::new(ast::ArithExpr {
             pos: first_unit.pos,
             inner: ast::ArithExprInner::ExprUnit(first_unit),
@@ -267,7 +270,7 @@ impl<'a> ParseContext<'a> {
         while i < inner_pairs.len() {
             if inner_pairs[i].as_rule() == Rule::arith_mul_op {
                 let op = self.parse_arith_mul_op(inner_pairs[i].clone())?;
-                let right_unit = self.parse_expr_unit(inner_pairs[i + 1].clone())?;
+                let right_unit = self.parse_cast_expr(inner_pairs[i + 1].clone())?;
                 let right = Box::new(ast::ArithExpr {
                     pos: right_unit.pos,
                     inner: ast::ArithExprInner::ExprUnit(right_unit),
@@ -314,6 +317,30 @@ impl<'a> ParseContext<'a> {
         Err(grammar_error("arith_mul_op", &pair_for_error))
     }
 
+    // --------------------------
+    // 【最终修复版】parse_cast_expr
+    // --------------------------
+    fn parse_cast_expr(&self, pair: Pair) -> ParseResult<Box<ast::ExprUnit>> {
+        let inner_pairs: Vec<_> = pair.into_inner().collect();
+        let expr = self.parse_expr_unit(inner_pairs[0].clone())?;
+
+        if inner_pairs.len() > 1 && inner_pairs[1].as_rule() == Rule::kw_as {
+            // 这里拿到的是 Option<TypeSpecifier>，直接 unwrap 即可（语法已保证合法）
+            let ty = self.parse_type_spec(inner_pairs[2].clone())?
+                .ok_or_else(|| grammar_error("expected type", &inner_pairs[2]))?;
+            
+            Ok(Box::new(ast::ExprUnit {
+                pos: expr.pos,
+                inner: ast::ExprUnitInner::Cast {
+                    expr,
+                    target_type: Box::new(ty),
+                },
+            }))
+        } else {
+            Ok(expr)
+        }
+    }
+
     pub(crate) fn parse_expr_unit(&self, pair: Pair) -> ParseResult<Box<ast::ExprUnit>> {
         let pair_for_error = pair.clone();
         let pos = get_pos(&pair);
@@ -325,6 +352,23 @@ impl<'a> ParseContext<'a> {
             .cloned()
             .collect();
 
+        // --------------------------
+        // 【新增】负浮点数
+        // --------------------------
+        if filtered.len() == 2
+            && filtered[0].as_rule() == Rule::op_sub
+            && filtered[1].as_rule() == Rule::float_literal
+        {
+            let val = filtered[1].as_str().parse::<f32>().map_err(|_| {
+                grammar_error("invalid float literal", &filtered[1])
+            })?;
+            return Ok(Box::new(ast::ExprUnit {
+                pos,
+                inner: ast::ExprUnitInner::Float(-val),
+            }));
+        }
+
+        // 原有：负整数
         if filtered.len() == 2
             && filtered[0].as_rule() == Rule::op_sub
             && filtered[1].as_rule() == Rule::num
@@ -350,6 +394,20 @@ impl<'a> ParseContext<'a> {
             }));
         }
 
+        // --------------------------
+        // 【新增】正浮点数（必须放在整数前面！）
+        // --------------------------
+        if filtered.len() == 1 && filtered[0].as_rule() == Rule::float_literal {
+            let val = filtered[0].as_str().parse::<f32>().map_err(|_| {
+                grammar_error("invalid float literal", &filtered[0])
+            })?;
+            return Ok(Box::new(ast::ExprUnit {
+                pos,
+                inner: ast::ExprUnitInner::Float(val),
+            }));
+        }
+
+        // 原有：整数
         if filtered.len() == 1 && filtered[0].as_rule() == Rule::num {
             let num = parse_num(filtered[0].clone())?;
             return Ok(Box::new(ast::ExprUnit {

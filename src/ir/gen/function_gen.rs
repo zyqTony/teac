@@ -459,6 +459,8 @@ impl<'ir> FunctionGenerator<'ir> {
             ast::ExprUnitInner::Reference(id) => {
                 return self.handle_reference_expr(id);
             }
+            ast::ExprUnitInner::Float(_) => todo!("float not implemented in IR"),
+            ast::ExprUnitInner::Cast { .. } => todo!("cast not implemented in IR"),
         }?;
 
         Ok(match operand.dtype() {

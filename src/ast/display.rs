@@ -6,9 +6,10 @@ use super::types::*;
 use std::fmt::{Display, Error, Formatter};
 
 impl Display for BuiltIn {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BuiltIn::Int => write!(f, "int"),
+            BuiltIn::Float => write!(f, "f32"), // 已补齐
         }
     }
 }
@@ -204,16 +205,19 @@ impl Display for FnCall {
     }
 }
 
+// 👇👇👇 【已补齐 Float + Cast】
 impl Display for ExprUnitInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
             ExprUnitInner::Num(n) => write!(f, "{}", n),
+            ExprUnitInner::Float(val) => write!(f, "{}", val),        // 补齐
             ExprUnitInner::Id(id) => write!(f, "{}", id),
             ExprUnitInner::ArithExpr(a) => write!(f, "{}", a),
             ExprUnitInner::FnCall(fc) => write!(f, "{}", fc),
             ExprUnitInner::ArrayExpr(ae) => write!(f, "{}", ae),
             ExprUnitInner::MemberExpr(me) => write!(f, "{}", me),
             ExprUnitInner::Reference(id) => write!(f, "&{}", id),
+            ExprUnitInner::Cast { expr, target_type } => write!(f, "({} as {})", expr, target_type), // 补齐
         }
     }
 }

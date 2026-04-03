@@ -1,5 +1,5 @@
 use super::ops::*;
-use super::types::Pos;
+use super::types::{Pos, TypeSpecifier}; // 引入 TypeSpecifier
 
 #[derive(Debug, Clone)]
 pub struct LeftVal {
@@ -119,15 +119,21 @@ impl FnCall {
     }
 }
 
+// 【关键修改】ExprUnitInner 新增 浮点 和 类型转换 节点
 #[derive(Debug, Clone)]
 pub enum ExprUnitInner {
     Num(i32),
+    Float(f32),        // 新增：浮点数字面量
     Id(String),
     ArithExpr(Box<ArithExpr>),
     FnCall(Box<FnCall>),
     ArrayExpr(Box<ArrayExpr>),
     MemberExpr(Box<MemberExpr>),
     Reference(String),
+    Cast {             // 新增：类型转换表达式 (expr as Type)
+        expr: Box<ExprUnit>,
+        target_type: Box<TypeSpecifier>,
+    },
 }
 
 #[derive(Debug, Clone)]

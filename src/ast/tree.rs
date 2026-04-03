@@ -2,6 +2,7 @@ use super::decl::*;
 use super::expr::*;
 use super::program::*;
 use super::stmt::*;
+use super::types::*;
 use std::fmt::{Error, Formatter};
 
 pub trait DisplayAsTree {
@@ -32,6 +33,41 @@ fn tree_indent(indent_levels: &[bool], is_last: bool) -> String {
         s.push_str("├─");
     }
     s
+}
+
+// ==============================
+// 【新增】TypeSpecifier 树状打印
+// ==============================
+impl DisplayAsTree for TypeSpecifier {
+    fn fmt_tree(
+        &self,
+        f: &mut Formatter<'_>,
+        indent_levels: &[bool],
+        is_last: bool,
+    ) -> Result<(), Error> {
+        writeln!(f, "{}TypeSpecifier", tree_indent(indent_levels, is_last))?;
+        let mut new_indent = indent_levels.to_vec();
+        new_indent.push(is_last);
+
+        match &self.inner {
+            TypeSpecifierInner::BuiltIn(b) => {
+                let name = match b {
+                    BuiltIn::Int => "int",
+                    BuiltIn::Float => "f32",
+                };
+                writeln!(f, "{}BuiltIn({})", tree_indent(&new_indent, true), name)
+            }
+            TypeSpecifierInner::Composite(name) => {
+                writeln!(f, "{}Composite({})", tree_indent(&new_indent, true), name)
+            }
+            TypeSpecifierInner::Reference(inner) => {
+                writeln!(f, "{}Reference", tree_indent(&new_indent, false))?;
+                let mut ref_indent = new_indent.clone();
+                ref_indent.push(false);
+                inner.fmt_tree(f, &ref_indent, true)
+            }
+        }
+    }
 }
 
 impl DisplayAsTree for Program {
@@ -584,6 +620,9 @@ impl DisplayAsTree for ArithBiOpExpr {
     }
 }
 
+// ==============================
+// 【最终版】ExprUnit 已修复 Cast
+// ==============================
 impl DisplayAsTree for ExprUnit {
     fn fmt_tree(
         &self,
@@ -596,6 +635,7 @@ impl DisplayAsTree for ExprUnit {
         new_indent.push(is_last);
         match &self.inner {
             ExprUnitInner::Num(n) => writeln!(f, "{}Num({})", tree_indent(&new_indent, true), n),
+            ExprUnitInner::Float(val) => writeln!(f, "{}Float({})", tree_indent(&new_indent, true), val),
             ExprUnitInner::Id(id) => writeln!(f, "{}Id({})", tree_indent(&new_indent, true), id),
             ExprUnitInner::ArithExpr(ae) => ae.fmt_tree(f, &new_indent, true),
             ExprUnitInner::FnCall(fc) => fc.fmt_tree(f, &new_indent, true),
@@ -603,6 +643,13 @@ impl DisplayAsTree for ExprUnit {
             ExprUnitInner::MemberExpr(me) => me.fmt_tree(f, &new_indent, true),
             ExprUnitInner::Reference(id) => {
                 writeln!(f, "{}Ref({})", tree_indent(&new_indent, true), id)
+            }
+            ExprUnitInner::Cast { expr, target_type } => {
+                writeln!(f, "{}Cast", tree_indent(&new_indent, false))?;
+                let mut cast_indent = new_indent.clone();
+                cast_indent.push(false);
+                expr.fmt_tree(f, &cast_indent, false)?;
+                (*target_type).fmt_tree(f, &cast_indent, true)
             }
         }
     }

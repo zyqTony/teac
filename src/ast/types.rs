@@ -3,6 +3,7 @@ pub type Pos = usize;
 #[derive(Debug, Clone)]
 pub enum BuiltIn {
     Int,
+    Float,  // 新增：浮点类型 f32
 }
 
 #[derive(Debug, Clone)]
